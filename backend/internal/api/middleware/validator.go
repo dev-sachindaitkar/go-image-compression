@@ -7,11 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const MaxFileSize = 10 * 1024 * 1024
-
-func ValidateFileSize() gin.HandlerFunc {
+func ValidateFileSize(maxFileSize int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// only validating POST requests
 		if c.Request.Method == http.MethodPost {
 			contentLengthStr := c.GetHeader("Content-Length")
 
@@ -21,13 +18,13 @@ func ValidateFileSize() gin.HandlerFunc {
 					c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid content length header format"})
 					return
 				}
-				if MaxFileSize < contentLength {
-					c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-						"error": "Payload too large. Maximum support size is 10MB / image ",
+				if contentLength > maxFileSize {
+					c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, gin.H{
+						"error": "Payload too large. Maximum supported size is 10MB.",
 					})
+					return // Halts further execution pipeline stages
 				}
 			}
-
 		}
 		c.Next()
 	}
