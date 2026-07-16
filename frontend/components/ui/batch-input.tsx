@@ -1,4 +1,4 @@
-import { ChangeEvent } from "react";
+import { ChangeEvent, useRef } from "react";
 import { Button } from "./button";
 
 interface BatchInputProps {
@@ -10,16 +10,27 @@ export default function BatchInput({
   onFileUpload,
   isUploading,
 }: BatchInputProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleIconClick = () => {
+    if (!isUploading && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   return (
     <div className="bg-white/80 backdrop-blur-md rounded-xl shadow-soft p-6 w-full ">
       <div className="flex flex-col items-center">
-        <div className="bg-primary/10 rounded-full p-3 mb-3">
+        <div
+          className="bg-primary/10 rounded-full p-3 mb-3 cursor-pointer  hover:bg-primary "
+          onClick={handleIconClick}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6 text-primary"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            className="h-6 w-6 text-primarytransition-colors duration-200 group-hover:text-sky-600"
           >
             <path
               strokeLinecap="round"
@@ -37,6 +48,7 @@ export default function BatchInput({
         </p>
         <label className="cursor-pointer">
           <input
+            ref={fileInputRef}
             type="file"
             multiple
             accept="image/jpeg,image/png"
