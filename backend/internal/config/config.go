@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -27,10 +26,8 @@ func LoadConfig() *Config {
 
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
-		fmt.Printf(" ............ port configured %s ", value)
 		return value
 	}
-	fmt.Printf(" ............ port configured %s ", fallback)
 	return fallback
 }
 

@@ -109,15 +109,16 @@ export function PipelineMonitor({ activeJobs }: PipelineMonitorProps) {
                     </div>
                   ) : (
                     /* Active Processing States */
-                    <div className="space-y-2">
+                    <div className="space-y-2.5 w-full">
                       <Progress
-                        value={job.percentage}
-                        className="h-1.5 bg-slate-100 [&>div]:bg-sky-500"
+                        // Explicitly bind to absolute numerical zero if queued
+                        value={job.status === "queued" ? 0 : job.percentage}
+                        className="h-3 bg-slate-100/80 rounded-full overflow-hidden transition-all duration-300"
                       />
                       <div className="flex justify-between items-center text-[11px] text-slate-400 font-mono">
                         <span>ID: {job.jobId.substring(0, 8)}</span>
-                        <span className="text-sky-600 font-bold">
-                          {job.percentage}%
+                        <span className="font-bold transition-colors text-xs">
+                          {job.status === "queued" ? "0" : job.percentage}%
                         </span>
                       </div>
                     </div>

@@ -21,27 +21,152 @@ export default function GoOptiFlowDashboard() {
 
     const formData = new FormData();
     formData.append("quality", compressionQuality[0].toString());
-
     for (let i = 0; i < selectedFiles.length; i++) {
       formData.append("images", selectedFiles[i]);
     }
 
     try {
-      const response = await fetch(API_ROUTES.UPLOAD, {
+      // 1. Stage the files on the server first
+      const uploadResponse = await fetch(API_ROUTES.UPLOAD, {
         method: "POST",
         body: formData,
       });
 
-      if (!response.ok)
-        throw new Error("Upload dispatch sequence rejected by server node");
+      if (!uploadResponse.ok) throw new Error("Staging sequence rejected.");
+
+      interface StagedJob {
+        jobId: string;
+        filename: string;
+        status: string;
+        percentage: number;
+        originalSize: number;
+      }
+      const queuedJobs: StagedJob[] = await uploadResponse.json();
+
+      // 2. Seed our Live Monitor layout context with the "queued" blocks immediately
+      if (typeof window !== "undefined" && progressMap) {
+        queuedJobs.forEach((job) => {
+          progressMap[job.jobId] = {
+            jobId: job.jobId,
+            filename: job.filename,
+            status: "queued",
+            percentage: 0,
+            originalSize: job.originalSize,
+            compressedSize: 0,
+          };
+        });
+      }
+
+      // 3. Extract the array of jobIds and issue the AUTOMATIC trigger execution payload
+      const jobIdsToProcess = queuedJobs.map((j) => j.jobId);
+
+      const compressResponse = await fetch(
+        "http://localhost:9090/api/compress",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobIds: jobIdsToProcess }),
+        },
+      );
+
+      if (!compressResponse.ok)
+        throw new Error("Compression execution trigger failed.");
     } catch (err) {
-      console.error("Network network transmission fault:", err);
-      alert("Failed to transmit batch files to the parallel Go engine.");
+      console.error("Pipeline failure:", err);
+      alert("Failed to coordinate pipeline streaming stages.");
     } finally {
       setIsUploading(false);
       e.target.value = "";
     }
   };
+  // const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+  //   const selectedFiles = e.target.files;
+  //   if (!selectedFiles || selectedFiles.length === 0) return;
+
+  //   setIsUploading(true);
+
+  //   const formData = new FormData();
+  //   formData.append("quality", compressionQuality[0].toString());
+
+  //   for (let i = 0; i < selectedFiles.length; i++) {
+  //     formData.append("images", selectedFiles[i]);
+  //   }
+
+  //   try {
+  //     const response = await fetch(API_ROUTES.UPLOAD, {
+  //       method: "POST",
+  //       body: formData,
+  //     });
+
+  //     if (!response.ok)
+  //       throw new Error("Upload dispatch sequence rejected by server node");
+
+  //     // 1. Parse the array of instantly generated staged job tokens from Go
+  //     interface StagedJob {
+  //       jobId: string;
+  //       filename: string;
+  //       status: string;
+  //       percentage: number;
+  //       originalSize: number;
+  //     }
+  //     const queuedJobs: StagedJob[] = await response.json();
+
+  //     // 2. Map the array into the frontend's expected context shape and register them
+  //     // We will access your state context/hook here to seed the monitor layout instantly.
+  //     if (typeof window !== "undefined" && progressMap) {
+  //       // We look at how useProgressStream manages progressMap updates below.
+  //       // For now, we will merge these clean, stable "queued" items directly.
+  //       queuedJobs.forEach((job) => {
+  //         // This populates your layout with the original sizes and "queued" labels at 0%
+  //         progressMap[job.jobId] = {
+  //           jobId: job.jobId,
+  //           filename: job.filename,
+  //           status: "queued",
+  //           percentage: 0,
+  //           originalSize: job.originalSize,
+  //           compressedSize: 0,
+  //         };
+  //       });
+  //     }
+  //   } catch (err) {
+  //     console.error("Network network transmission fault:", err);
+  //     alert(
+  //       "Failed to transmit batch files to the parallel Go staging engine.",
+  //     );
+  //   } finally {
+  //     setIsUploading(false);
+  //     e.target.value = "";
+  //   }
+  // };
+  // const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+  //   const selectedFiles = e.target.files;
+  //   if (!selectedFiles || selectedFiles.length === 0) return;
+
+  //   setIsUploading(true);
+
+  //   const formData = new FormData();
+  //   formData.append("quality", compressionQuality[0].toString());
+
+  //   for (let i = 0; i < selectedFiles.length; i++) {
+  //     formData.append("images", selectedFiles[i]);
+  //   }
+
+  //   try {
+  //     const response = await fetch(API_ROUTES.UPLOAD, {
+  //       method: "POST",
+  //       body: formData,
+  //     });
+
+  //     if (!response.ok)
+  //       throw new Error("Upload dispatch sequence rejected by server node");
+  //   } catch (err) {
+  //     console.error("Network network transmission fault:", err);
+  //     alert("Failed to transmit batch files to the parallel Go engine.");
+  //   } finally {
+  //     setIsUploading(false);
+  //     e.target.value = "";
+  //   }
+  // };
 
   return (
     <main className="h-screen min-h-screen w-full p-6 md:p-12 bg-transparent flex flex-col overflow-hidden">

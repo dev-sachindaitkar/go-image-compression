@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -17,11 +18,13 @@ type CachedAssets struct {
 }
 type ImageHandler struct {
 	Dispatcher *pool.Dispatcher
+	StagedJobs map[string]pool.Job
 }
 
 func NewImageHandler(d *pool.Dispatcher) *ImageHandler {
 	h := &ImageHandler{
 		Dispatcher: d,
+		StagedJobs: make(map[string]pool.Job),
 	}
 	return h
 }
@@ -48,6 +51,16 @@ func (h *ImageHandler) UploadBatch(c *gin.Context) {
 		return
 	}
 
+	type StagedJobResponse struct {
+		JobId        string `json:"jobId"`
+		Filename     string `json:"filename"`
+		Status       string `json:"status"` // will be "queued"
+		Percentage   int    `json:"percentage"`
+		OriginalSize int64  `json:"originalSize"`
+	}
+
+	var responsePayload []StagedJobResponse
+
 	var trackingIDs []string
 
 	for _, fileHeader := range files {
@@ -66,35 +79,48 @@ func (h *ImageHandler) UploadBatch(c *gin.Context) {
 		jobId := uuid.New().String()
 		trackingIDs = append(trackingIDs, jobId)
 
-		// construct pool job
-		job := pool.Job{
+		stagedJobs := pool.Job{
 			Id:       jobId,
 			FileName: fileHeader.Filename,
 			Data:     fileBytes,
 			Quality:  quality,
 		}
+		h.StagedJobs[jobId] = stagedJobs
+		slog.Info("[Staging Engine] Asset staged successfully. Awaiting trigger event...", "job_id", jobId, "filename", fileHeader.Filename)
+		responsePayload = append(responsePayload, StagedJobResponse{
+			JobId:        jobId,
+			Filename:     fileHeader.Filename,
+			Status:       "queued", // Staged status on initialization
+			Percentage:   0,
+			OriginalSize: int64(len(fileBytes)),
+		})
 
-		select {
-		case h.Dispatcher.JobQueue <- job:
-			h.Dispatcher.Progress <- pool.ProgressUpdate{
-				JobId:      jobId,
-				FileName:   fileHeader.Filename,
-				Percentage: 0,
-				Status:     "queued",
-			}
+		// construct pool job
+		// job := pool.Job{
+		// 	Id:       jobId,
+		// 	FileName: fileHeader.Filename,
+		// 	Data:     fileBytes,
+		// 	Quality:  quality,
+		// }
 
-		default:
-			// Backpressure fallback if the channel buffer hits absolute overflow limits
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Server job queue is currently full. Try again later."})
-			return
-		}
+		// select {
+		// case h.Dispatcher.JobQueue <- job:
+		// 	h.Dispatcher.Progress <- pool.ProgressUpdate{
+		// 		JobId:      jobId,
+		// 		FileName:   fileHeader.Filename,
+		// 		Percentage: 0,
+		// 		Status:     "queued",
+		// 	}
+
+		// default:
+		// 	// Backpressure fallback if the channel buffer hits absolute overflow limits
+		// 	c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Server job queue is currently full. Try again later."})
+		// 	return
+		// }
 
 	}
 	// 4. Respond instantly with 202 Accepted status and tracking metadata
-	c.JSON(http.StatusAccepted, gin.H{
-		"message":   "Batch upload successful. Processing started asynchronously.",
-		"batch_ids": trackingIDs,
-	})
+	c.JSON(http.StatusOK, responsePayload)
 }
 
 // StreamProgress handles long-lived Server-Sent Events (SSE) streaming connections
@@ -114,5 +140,46 @@ func (h *ImageHandler) StreamProgress(c *gin.Context) {
 			return true // Keep connection stream context alive
 		}
 		return false // Stops stream tracking if the progress channel gets closed natively
+	})
+}
+
+func (h *ImageHandler) TriggerCompression(c *gin.Context) {
+	type TriggerPayload struct {
+		JobIds []string `json:"jobIds"`
+	}
+
+	var payload TriggerPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+	}
+
+	if len(payload.JobIds) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No job tracking IDs provided for execution"})
+		return
+	}
+
+	triggeredCount := 0
+
+	for _, id := range payload.JobIds {
+		job, exists := h.StagedJobs[id]
+
+		if !exists {
+			slog.Warn("[Pipeline] Attempted to compress a job that is missing or already processed", "job_id", id)
+			continue
+		}
+
+		select {
+		case h.Dispatcher.JobQueue <- job:
+			triggeredCount++
+			delete(h.StagedJobs, id)
+			slog.Info("[Pipeline] Successfully dispatched staged asset to core workers", "job_id", id)
+		default:
+			slog.Error("[Pipeline] Queue backpressure overflow during execution routing", "job_id", id)
+		}
+
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":         "Compression sequence initialized successfully.",
+		"triggered_count": triggeredCount,
 	})
 }

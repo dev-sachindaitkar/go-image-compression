@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,15 +12,15 @@ import (
 	"github.com/dev-sachindaitkar/go-image-compression/internal/api/handlers"
 	"github.com/dev-sachindaitkar/go-image-compression/internal/api/router"
 	"github.com/dev-sachindaitkar/go-image-compression/internal/config"
+	"github.com/dev-sachindaitkar/go-image-compression/internal/logger"
 	"github.com/dev-sachindaitkar/go-image-compression/internal/pool"
 	"github.com/joho/godotenv"
 )
 
 func main() {
+	logHandler := logger.NewColorTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+	slog.SetDefault(slog.New(logHandler))
 	slog.Info("[System] Initializing Config conext...")
-
-	cwd, _ := os.Getwd()
-	log.Printf("[Env Debug] Server process is running from: %s", cwd)
 
 	if err := godotenv.Load(); err != nil {
 		slog.Info("[Warning] .env file not found, using default values")
@@ -43,7 +42,7 @@ func main() {
 			Result:    res,
 			CreatedAt: time.Now(),
 		} // Matches your lowercase 'JobId' struct tag
-		log.Printf("[Cache Debug] Worker inserted job %s directly into instance cache. Current Size: %d", res.JobId, len(downloadHandler.DownloadCache))
+		slog.Info("[Cache Debug] Worker inserted job %s directly into instance cache. Current Size: ", res.JobId, len(downloadHandler.DownloadCache))
 		downloadHandler.CacheMu.Unlock()
 	}
 
@@ -59,7 +58,7 @@ func main() {
 	// Create channel listening for kernel kill signals
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("[System] Listen and serve crash event: %v", err)
+			slog.Error("[System] Listen and serve crash event: ", "error", err.Error())
 		}
 	}()
 	slog.Info("[System] Network port matrix bound successfully on :", cfg.Port, ".")
@@ -68,14 +67,14 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("[System] Shutdown broadcast signal received. Stopping application safely...")
+	slog.Info("[System] Shutdown broadcast signal received. Stopping application safely...")
 
 	// Create a hard 5-second maximum context safety net window for remaining network jobs to finish
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("[System] Server forced to close prematurely: %v", err)
+		slog.Error("[System] Server forced to close prematurely: %v", "error", err.Error())
 	}
 
 	// Shut down our internal worker pool loops safely

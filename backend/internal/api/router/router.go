@@ -31,7 +31,8 @@ func SetupRouter(cfg *config.Config, imageHandler *handlers.ImageHandler, downlo
 	{
 		api.POST("/upload", imageHandler.UploadBatch)
 		api.GET("/progress", imageHandler.StreamProgress)
-		api.POST("/download/:id", downloadHandler.DownloadFile)
+		api.GET("/download/:id", downloadHandler.DownloadFile)
+		api.POST("/compress", imageHandler.TriggerCompression)
 	}
 	return r
 }
