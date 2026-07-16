@@ -10,9 +10,11 @@ The project is organized into a mono-repo structure containing both the high-per
 ├── backend/                # Go (Golang) API Gateway & Processing Service
 │   ├── cmd/                # Entry points for the application
 │   ├── internal/           # Private application and business logic
-│   └── pkg/                # Explicit library code usable by other services
 ├── frontend/               # Next.js Orchestration & UI Layer
-│   ├── src/                # Frontend application source code
+│   ├── app/                # Basic landing page
+│   ├── components/         # reusable components
+│   ├── constants/          # constants
+│   ├── hooks/              # global hooks
 │   └── public/             # Static assets
 ├── README.md               # Project documentation
 └── .gitignore              # Git ignore rules
