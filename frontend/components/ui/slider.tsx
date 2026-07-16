@@ -1,6 +1,5 @@
-import { Slider as SliderPrimitive } from "@base-ui/react/slider"
-
-import { cn } from "@/lib/utils"
+import { Slider as SliderPrimitive } from "@base-ui/react/slider";
+import { cn } from "@/lib/utils";
 
 function Slider({
   className,
@@ -14,11 +13,11 @@ function Slider({
     ? value
     : Array.isArray(defaultValue)
       ? defaultValue
-      : [min, max]
+      : [min, max];
 
   return (
     <SliderPrimitive.Root
-      className={cn("data-horizontal:w-full data-vertical:h-full", className)}
+      className={cn("w-full py-2", className)}
       data-slot="slider"
       defaultValue={defaultValue}
       value={value}
@@ -27,26 +26,29 @@ function Slider({
       thumbAlignment="edge"
       {...props}
     >
-      <SliderPrimitive.Control className="relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col">
+      <SliderPrimitive.Control className="relative flex w-full touch-none items-center select-none data-disabled:opacity-50 min-h-6 cursor-pointer">
+        {/* Track Background: Explicit h-2 height rule guarantees visibility across all dark layers */}
         <SliderPrimitive.Track
           data-slot="slider-track"
-          className="relative grow overflow-hidden bg-input/50 select-none data-horizontal:h-0.5 data-horizontal:w-full data-vertical:h-full data-vertical:w-0.5"
+          className="relative h-2 w-full grow overflow-hidden bg-muted rounded-full select-none"
         >
           <SliderPrimitive.Indicator
             data-slot="slider-range"
-            className="bg-primary select-none data-horizontal:h-full data-vertical:w-full"
+            className="absolute h-full bg-primary select-none rounded-full"
           />
         </SliderPrimitive.Track>
+
+        {/* Thumb circular handle controller layer */}
         {Array.from({ length: _values.length }, (_, index) => (
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}
-            className="block size-3 shrink-0 border-none bg-primary transition-colors select-none hover:ring-2 hover:ring-ring/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+            className="block size-5 shrink-0 rounded-full border-2 border-primary bg-background shadow-md shadow-black/40 transition-transform select-none hover:scale-110 focus-visible:outline-none cursor-grab active:cursor-grabbing"
           />
         ))}
       </SliderPrimitive.Control>
     </SliderPrimitive.Root>
-  )
+  );
 }
 
-export { Slider }
+export { Slider };

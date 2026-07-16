@@ -10,7 +10,7 @@ export function useProgressStream() {
   );
 
   useEffect(() => {
-    // Establishes a persistent Server-Sent Events link to our Go service matrix
+    // Open a persistent connection to the Go background pipeline
     const eventSource = new EventSource(API_ROUTES.PROGRESS);
 
     eventSource.addEventListener("progress", (event: MessageEvent) => {
@@ -26,26 +26,28 @@ export function useProgressStream() {
           compressedSize: rawData.compressed_size,
         };
 
-        // Appends or updates the specific file token record dynamically in state
+        // Dynamically add or merge the progress token frame into our state mapping
         setProgressMap((prev) => ({
           ...prev,
           [updatedProgress.jobId]: updatedProgress,
         }));
       } catch (err) {
-        console.error("Error parsing SSE pipeline payload frame:", err);
+        console.error("Error parsing incoming SSE layout frame:", err);
       }
     });
 
     eventSource.onerror = (err) => {
-      console.error("SSE Stream channel connectivity interruption:", err);
+      console.error(
+        "SSE connection interrupted. Disconnecting stream channel:",
+        err,
+      );
       eventSource.close();
     };
 
-    // Clean up function to close the network connection when the component unmounts
     return () => {
       eventSource.close();
     };
   }, []);
 
-  return { progressMap, setProgressMap };
+  return { progressMap };
 }
